@@ -1,0 +1,4 @@
+.env
+flaskproject/
+__pycache__/
+*.db
