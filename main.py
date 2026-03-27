@@ -14,8 +14,7 @@ jwt = JWTManager(app)
 
 def get_db():
     db_name = os.getenv("DATABASE")
-    conn = sqlite3.connect(db_name)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     return conn
 
 
@@ -30,7 +29,7 @@ def register():
         
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)",
+        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)",
                       (data["username"], hashed_password))
         conn.commit()
         conn.close()
@@ -47,7 +46,7 @@ def login():
         
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (data["username"],))
+        cursor.execute("SELECT * FROM users WHERE username = %s", (data["username"],))
         user = cursor.fetchone()
         conn.close()
         
@@ -77,7 +76,7 @@ def get_tasks():
     if request.method == "GET":
         try:
             username = get_jwt_identity()
-            cursor.execute("SELECT * FROM tasks WHERE username = ?",(username,))
+            cursor.execute("SELECT * FROM tasks WHERE username = %s",(username,))
             rows = cursor.fetchall()
             conn.close()
             tasks = [dict(row) for row in rows]
@@ -91,7 +90,7 @@ def get_tasks():
             if "title" not in new_task:
                 return jsonify({"error": "title is required"}), 400
             username = get_jwt_identity()
-            cursor.execute("INSERT INTO tasks (title, username) VALUES (?, ?)",
+            cursor.execute("INSERT INTO tasks (title, username) VALUES (%s, %s)",
                       (new_task["title"], username))
             conn.commit()
             conn.close()
@@ -107,7 +106,7 @@ def update_task(title):
     if request.method == "PUT":
             try:
                 update_data = request.get_json()
-                cursor.execute("UPDATE tasks SET status = ? WHERE title = ?",
+                cursor.execute("UPDATE tasks SET status = %s WHERE title = %s",
                 (update_data["status"],title))
                 conn.commit()
                 conn.close()
@@ -117,7 +116,7 @@ def update_task(title):
         
     elif request.method =="DELETE":
         try:
-            cursor.execute("DELETE FROM tasks WHERE title = ?",(title,))
+            cursor.execute("DELETE FROM tasks WHERE title = %s",(title,))
             conn.commit()
             conn.close()
             return jsonify({"message":"task deleted successfully"})
