@@ -3,3 +3,4 @@ flask-jwt-extended
 python-dotenv
 werkzeug
 gunicorn
+psycopg2-binary
