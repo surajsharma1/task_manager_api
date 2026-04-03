@@ -1,4 +1,4 @@
-import sqlite3
+import psycopg2
 import os
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
@@ -13,7 +13,6 @@ app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")
 jwt = JWTManager(app)
 
 def get_db():
-    db_name = os.getenv("DATABASE")
     conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     return conn
 
@@ -53,7 +52,7 @@ def login():
         if user is None:
             return jsonify({"error": "user not found"}), 404
         
-        if not check_password_hash(user["password"], data["password"]):
+        if not check_password_hash(user[2], data["password"]):
             return jsonify({"error": "incorrect password"}), 401
         
         token = create_access_token(identity=data["username"])
@@ -70,58 +69,58 @@ def home():
 @jwt_required()
 
 def get_tasks():
-    conn = get_db()
-    cursor = conn.cursor()
+        conn = get_db()
+        cursor = conn.cursor()
     
-    if request.method == "GET":
-        try:
-            username = get_jwt_identity()
-            cursor.execute("SELECT * FROM tasks WHERE username = %s",(username,))
-            rows = cursor.fetchall()
-            conn.close()
-            tasks = [dict(row) for row in rows]
-            return jsonify(tasks)
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        if request.method == "GET":
+            try:
+                username = get_jwt_identity()
+                cursor.execute("SELECT * FROM tasks WHERE username = %s",(username,))
+                rows = cursor.fetchall()
+                conn.close()
+                tasks = [{"id": row[0], "title": row[1],  "username": row[2],"status": row[3]} for row in rows]
+                return jsonify(tasks)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
     
-    elif request.method == "POST":
-        try:
-            new_task = request.get_json()
-            if "title" not in new_task:
-                return jsonify({"error": "title is required"}), 400
-            username = get_jwt_identity()
-            cursor.execute("INSERT INTO tasks (title, username) VALUES (%s, %s)",
-                      (new_task["title"], username))
-            conn.commit()
-            conn.close()
-            return jsonify({"message": "task added successfully"})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        elif request.method == "POST":
+            try:
+                new_task = request.get_json()
+                if "title" not in new_task:
+                    return jsonify({"error": "title is required"}), 400
+                username = get_jwt_identity()
+                cursor.execute("INSERT INTO tasks (title, username) VALUES (%s, %s)",
+                          (new_task["title"], username))
+                conn.commit()
+                conn.close()
+                return jsonify({"message": "task added successfully"})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
         
 @app.route("/tasks/<title>", methods=["PUT","DELETE"])
 @jwt_required()
 def update_task(title):
-    conn = get_db()
-    cursor = conn.cursor()
-    if request.method == "PUT":
+        conn = get_db()
+        cursor = conn.cursor()
+        if request.method == "PUT":
+                try:
+                    update_data = request.get_json()
+                    cursor.execute("UPDATE tasks SET status = %s WHERE title = %s",
+                    (update_data["status"],title))
+                    conn.commit()
+                    conn.close()
+                    return jsonify({"message":"task status updated successfully"})
+                except Exception as e:
+                    return jsonify({"error": str(e)}), 500
+            
+        elif request.method =="DELETE":
             try:
-                update_data = request.get_json()
-                cursor.execute("UPDATE tasks SET status = %s WHERE title = %s",
-                (update_data["status"],title))
+                cursor.execute("DELETE FROM tasks WHERE title = %s",(title,))
                 conn.commit()
                 conn.close()
-                return jsonify({"message":"task status updated successfully"})
+                return jsonify({"message":"task deleted successfully"})
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
-        
-    elif request.method =="DELETE":
-        try:
-            cursor.execute("DELETE FROM tasks WHERE title = %s",(title,))
-            conn.commit()
-            conn.close()
-            return jsonify({"message":"task deleted successfully"})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
 
 
        
